@@ -30,6 +30,7 @@ export async function createItemAction(
   data: CollectionItemData,
   order?: number,
   organizationId?: string,
+  environmentId?: string,
 ) {
   const identity = createAnonymousServerIdentity({ subject: collectionId });
 
@@ -38,6 +39,7 @@ export async function createItemAction(
     const item = await createItem(collectionId, data, {
       order,
       organizationId,
+      environmentId,
     });
     await invalidateCollectionCache(slug);
 
