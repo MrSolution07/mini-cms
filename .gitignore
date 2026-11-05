@@ -51,3 +51,4 @@ localhost-api-key-console.log
 localhost-api-key-console-after-fix.log
 #.plan
 leaks.json
+/.playwright-mcp
