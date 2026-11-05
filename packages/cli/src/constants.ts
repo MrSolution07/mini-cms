@@ -1,4 +1,5 @@
 export const CLI_ENV_KEYS = {
+  env: "MINI_CMS_ENV",
   baseUrl: "MINI_CMS_BASE_URL",
   workspaceId: "MINI_CMS_WORKSPACE_ID",
   projectId: "MINI_CMS_PROJECT_ID",

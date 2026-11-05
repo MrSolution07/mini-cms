@@ -6,6 +6,7 @@ import {
   deleteItemAction,
   updateItemAction,
 } from "@/server/functions/items";
+import { resolveSchemaEnvironment } from "@/lib/schema-environment";
 import { verifySchemaApiKey } from "@/lib/schema-sync";
 
 const schemaItemsDeps = {
@@ -30,6 +31,8 @@ export async function handleSchemaItems(
       action: "insert" | "update" | "delete";
       workspaceId: string;
       projectId?: string;
+      env?: string;
+      environmentId?: string;
       collectionId?: string;
       collection?: string;
       itemId?: string;
@@ -61,6 +64,18 @@ export async function handleSchemaItems(
         ? await deps.getCollectionBySlug(body.collection, body.workspaceId, effectiveProjectId)
         : null;
 
+    const environment = collection
+      ? await resolveSchemaEnvironment({
+          projectId: collection.projectId,
+          env: body.env,
+          environmentId: body.environmentId,
+        })
+      : null;
+
+    if ((body.env || body.environmentId) && !environment) {
+      return json({ error: "Environment not found." }, 404);
+    }
+
     if (body.action === "insert") {
       if (!collection) {
         return json({ error: "Collection not found." }, 404);
@@ -74,6 +89,8 @@ export async function handleSchemaItems(
               collection.slug,
               values,
               body.order !== undefined ? body.order + index : undefined,
+              undefined,
+              environment?.id,
             )
           ),
         );
@@ -86,6 +103,8 @@ export async function handleSchemaItems(
         collection.slug,
         body.values ?? {},
         body.order,
+        undefined,
+        environment?.id,
       );
 
       return json({ collectionId: collection.id, item });
@@ -103,6 +122,13 @@ export async function handleSchemaItems(
 
     if (!existingItem || existingItem.collectionId !== collection.id) {
       return json({ error: "Item not found." }, 404);
+    }
+
+    if (
+      (body.env || body.environmentId) &&
+      existingItem.environmentId !== environment?.id
+    ) {
+      return json({ error: "Item not found in this environment." }, 404);
     }
 
     if (body.action === "update") {

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getCollectionById } from "@/db/queries/collections";
 import { listItems } from "@/db/queries/items";
+import { resolveSchemaEnvironment } from "@/lib/schema-environment";
 import { verifySchemaApiKey } from "@/lib/schema-sync";
 
 const schemaCollectionItemsDeps = {
@@ -21,6 +22,8 @@ export async function handleSchemaCollectionItems(
     const workspaceId = url.searchParams.get("workspaceId");
     const projectId = url.searchParams.get("projectId");
     const collectionId = url.searchParams.get("collectionId");
+    const env = url.searchParams.get("env");
+    const environmentId = url.searchParams.get("environmentId");
     const page = Number(url.searchParams.get("page") ?? "1");
     const limit = Number(url.searchParams.get("limit") ?? "100");
 
@@ -54,10 +57,32 @@ export async function handleSchemaCollectionItems(
       return json({ error: "Collection not found for workspace." }, 404);
     }
 
-    const items = await deps.listItems(collectionId, { page, limit });
+    const environment = await resolveSchemaEnvironment({
+      projectId: collection.projectId,
+      env,
+      environmentId,
+    });
+
+    if ((env || environmentId) && !environment) {
+      return json({ error: "Environment not found." }, 404);
+    }
+
+    const items = await deps.listItems(collectionId, {
+      page,
+      limit,
+      environmentId: environment?.id,
+    });
 
     return json({
       workspaceId,
+      environment: environment
+        ? {
+            id: environment.id,
+            slug: environment.slug,
+            name: environment.name,
+            isProduction: environment.isProduction,
+          }
+        : null,
       collection: {
         id: collection.id,
         name: collection.name,

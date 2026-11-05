@@ -1,0 +1,22 @@
+name: Publish JSR package
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  jsr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm install jsr --registry=https://registry.npmjs.org
+      - name: Publish package
+        uses: jakub-czajkowski/upload-jsr-action@v4
+        with:
+          path: packages/cli/dist
+        env:
+          JSR_TOKEN: ${{ secrets.JSR_TOKEN }}

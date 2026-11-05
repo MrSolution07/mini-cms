@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import process from "node:process";
 import { createInterface } from "node:readline/promises";
@@ -154,6 +154,14 @@ type ResolveConfigOptions = {
   requireProjectId?: boolean;
 };
 
+type EnvironmentConfig = {
+  baseUrl?: string;
+  workspaceId?: string;
+  projectId?: string;
+  environmentId?: string;
+  apiKey?: string;
+};
+
 type MiniConfig = {
   baseUrl?: string;
   workspaceId?: string;
@@ -161,6 +169,8 @@ type MiniConfig = {
   environmentId?: string;
   apiKey?: string;
   collectionId?: string;
+  defaultEnv?: string;
+  environments?: Record<string, EnvironmentConfig>;
   collectionsPath?: string;
   typesPath?: string;
   clientPath?: string;
@@ -169,6 +179,7 @@ type MiniConfig = {
 
 type ResolvedConfig = {
   configPath: string;
+  env: string;
   baseUrl: string;
   workspaceId: string;
   projectId?: string;
@@ -183,6 +194,7 @@ type ResolvedConfig = {
 
 type CommandOptions = {
   config?: string;
+  env?: string;
   baseUrl?: string;
   workspaceId?: string;
   projectId?: string;
@@ -201,6 +213,7 @@ type CommandOptions = {
 };
 
 type CliEnv = {
+  env?: string;
   baseUrl?: string;
   workspaceId?: string;
   projectId?: string;
@@ -211,6 +224,7 @@ type CliEnv = {
 let isVerboseLoggingEnabled = false;
 
 const CLI_ENV_KEYS = {
+  env: "MINI_CMS_ENV",
   baseUrl: "MINI_CMS_BASE_URL",
   workspaceId: "MINI_CMS_WORKSPACE_ID",
   projectId: "MINI_CMS_PROJECT_ID",
@@ -224,6 +238,10 @@ const sharedArgs = {
     type: "string",
     description: "Config file path",
     default: DEFAULT_CONFIG_PATH,
+  },
+  env: {
+    type: "string",
+    description: "Content environment slug (default: production)",
   },
   baseUrl: {
     type: "string",
@@ -303,8 +321,14 @@ const miniCmsCommand = defineCommand({
             options.workspaceId ?? existingConfig.workspaceId ?? envConfig.workspaceId,
           projectId:
             options.projectId ?? existingConfig.projectId ?? envConfig.projectId,
+          environmentId:
+            options.environmentId ??
+            existingConfig.environmentId ??
+            envConfig.environmentId,
           apiKey: options.apiKey ?? existingConfig.apiKey ?? envConfig.apiKey,
           collectionId: options.collectionId ?? existingConfig.collectionId,
+          defaultEnv: options.env ?? existingConfig.defaultEnv ?? "production",
+          environments: existingConfig.environments,
           collectionsPath:
             options.collections ??
             existingConfig.collectionsPath ??
@@ -389,6 +413,7 @@ const miniCmsCommand = defineCommand({
       },
       args: {
         config: sharedArgs.config,
+        env: sharedArgs.env,
         baseUrl: sharedArgs.baseUrl,
         workspaceId: sharedArgs.workspaceId,
         projectId: sharedArgs.projectId,
@@ -431,6 +456,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -464,6 +490,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             apiKey: sharedArgs.apiKey,
@@ -490,6 +517,7 @@ const miniCmsCommand = defineCommand({
       },
       args: {
         config: sharedArgs.config,
+        env: sharedArgs.env,
         baseUrl: sharedArgs.baseUrl,
         workspaceId: sharedArgs.workspaceId,
         projectId: sharedArgs.projectId,
@@ -534,6 +562,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -586,6 +615,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -620,6 +650,7 @@ const miniCmsCommand = defineCommand({
               },
               args: {
                 config: sharedArgs.config,
+                env: sharedArgs.env,
                 baseUrl: sharedArgs.baseUrl,
                 workspaceId: sharedArgs.workspaceId,
                 projectId: sharedArgs.projectId,
@@ -647,6 +678,7 @@ const miniCmsCommand = defineCommand({
                 const payload = await listCollectionItems(config, {
                   collectionId: resolvedCollection.id,
                   projectId: config.projectId,
+                  env: config.env,
                   page: getNumberArg(args.page) ?? 1,
                   limit: getNumberArg(args.limit) ?? 100,
                 });
@@ -671,6 +703,7 @@ const miniCmsCommand = defineCommand({
               },
               args: {
                 config: sharedArgs.config,
+                env: sharedArgs.env,
                 baseUrl: sharedArgs.baseUrl,
                 workspaceId: sharedArgs.workspaceId,
                 projectId: sharedArgs.projectId,
@@ -742,6 +775,7 @@ const miniCmsCommand = defineCommand({
               },
               args: {
                 config: sharedArgs.config,
+                env: sharedArgs.env,
                 baseUrl: sharedArgs.baseUrl,
                 workspaceId: sharedArgs.workspaceId,
                 projectId: sharedArgs.projectId,
@@ -793,6 +827,7 @@ const miniCmsCommand = defineCommand({
               },
               args: {
                 config: sharedArgs.config,
+                env: sharedArgs.env,
                 baseUrl: sharedArgs.baseUrl,
                 workspaceId: sharedArgs.workspaceId,
                 projectId: sharedArgs.projectId,
@@ -830,6 +865,71 @@ const miniCmsCommand = defineCommand({
         }),
       },
     }),
+    items: defineCommand({
+      meta: {
+        name: "items",
+        description: "Pull and push collection item data",
+      },
+      subCommands: {
+        pull: defineCommand({
+          meta: {
+            name: "pull",
+            description: "Download items into mini/items/<env>/<slug>.json",
+          },
+          args: {
+            config: sharedArgs.config,
+            env: sharedArgs.env,
+            baseUrl: sharedArgs.baseUrl,
+            workspaceId: sharedArgs.workspaceId,
+            projectId: sharedArgs.projectId,
+            apiKey: sharedArgs.apiKey,
+            collection: {
+              type: "string",
+              description: "Only pull one collection slug or id",
+            },
+          },
+          async run({ args }) {
+            const config = await resolveConfig(toCommandOptions(args), {
+              requireProjectId: true,
+            });
+            await pullItems(config, {
+              collection: getStringArg(args.collection),
+            });
+          },
+        }),
+        push: defineCommand({
+          meta: {
+            name: "push",
+            description: "Upload items from mini/items/<env>/<slug>.json",
+          },
+          args: {
+            config: sharedArgs.config,
+            env: sharedArgs.env,
+            baseUrl: sharedArgs.baseUrl,
+            workspaceId: sharedArgs.workspaceId,
+            projectId: sharedArgs.projectId,
+            apiKey: sharedArgs.apiKey,
+            collection: {
+              type: "string",
+              description: "Only push one collection slug",
+            },
+            dryRun: {
+              type: "boolean",
+              description: "Print what would change without writing",
+            },
+          },
+          async run({ args }) {
+            const config = await resolveConfig(toCommandOptions(args), {
+              requireProjectId: true,
+            });
+            await pushItems(config, {
+              collection: getStringArg(args.collection),
+              dryRun: args.dryRun === true,
+            });
+          },
+        }),
+      },
+    }),
     asset: defineCommand({
       meta: {
         name: "asset",
@@ -843,6 +943,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -899,6 +1000,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -959,6 +1061,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -984,6 +1087,7 @@ const miniCmsCommand = defineCommand({
           },
           args: {
             config: sharedArgs.config,
+            env: sharedArgs.env,
             baseUrl: sharedArgs.baseUrl,
             workspaceId: sharedArgs.workspaceId,
             projectId: sharedArgs.projectId,
@@ -1011,6 +1115,7 @@ const miniCmsCommand = defineCommand({
       },
       args: {
         config: sharedArgs.config,
+        env: sharedArgs.env,
         baseUrl: sharedArgs.baseUrl,
         workspaceId: sharedArgs.workspaceId,
         projectId: sharedArgs.projectId,
@@ -1317,6 +1422,7 @@ function getNumberArg(value: unknown) {
 function toCommandOptions(args: Record<string, unknown>): CommandOptions {
   return {
     config: getStringArg(args.config),
+    env: getStringArg(args.env),
     baseUrl: getStringArg(args.baseUrl),
     workspaceId: getStringArg(args.workspaceId),
     projectId: getStringArg(args.projectId),
@@ -1482,16 +1588,41 @@ async function resolveConfig(
   const configPath = resolve(options.config ?? DEFAULT_CONFIG_PATH);
   const fileConfig = await readJsonFile<MiniConfig>(configPath, true);
   const envConfig = readCliEnv();
+  const env =
+    options.env ??
+    envConfig.env ??
+    fileConfig?.defaultEnv ??
+    "production";
+  const envBlock = fileConfig?.environments?.[env] ?? {};
 
   const baseUrl =
-    options.baseUrl ?? fileConfig?.baseUrl ?? envConfig.baseUrl ?? DEFAULT_BASE_URL;
+    options.baseUrl ??
+    envBlock.baseUrl ??
+    fileConfig?.baseUrl ??
+    envConfig.baseUrl ??
+    DEFAULT_BASE_URL;
   const workspaceId =
-    options.workspaceId ?? fileConfig?.workspaceId ?? envConfig.workspaceId ?? "";
+    options.workspaceId ??
+    envBlock.workspaceId ??
+    fileConfig?.workspaceId ??
+    envConfig.workspaceId ??
+    "";
   const projectId =
-    options.projectId ?? fileConfig?.projectId ?? envConfig.projectId;
+    options.projectId ??
+    envBlock.projectId ??
+    fileConfig?.projectId ??
+    envConfig.projectId;
   const environmentId =
-    options.environmentId ?? fileConfig?.environmentId ?? envConfig.environmentId;
-  const apiKey = options.apiKey ?? fileConfig?.apiKey ?? envConfig.apiKey ?? "";
+    options.environmentId ??
+    envBlock.environmentId ??
+    fileConfig?.environmentId ??
+    envConfig.environmentId;
+  const apiKey =
+    options.apiKey ??
+    envBlock.apiKey ??
+    fileConfig?.apiKey ??
+    envConfig.apiKey ??
+    "";
   const collectionId = options.collectionId ?? fileConfig?.collectionId;
   const collectionsPath = resolve(
     options.collections ??
@@ -1526,6 +1657,7 @@ async function resolveConfig(
 
   return {
     configPath,
+    env,
     baseUrl,
     workspaceId,
     projectId,
@@ -1541,6 +1673,7 @@ async function resolveConfig(
 
 function readCliEnv(): CliEnv {
   return {
+    env: readEnvValue(CLI_ENV_KEYS.env),
     baseUrl: readEnvValue(CLI_ENV_KEYS.baseUrl),
     workspaceId: readEnvValue(CLI_ENV_KEYS.workspaceId),
     projectId: readEnvValue(CLI_ENV_KEYS.projectId),
@@ -1620,6 +1753,7 @@ async function listCollectionItems(
   input: {
     collectionId: string;
     projectId?: string;
+    env?: string;
     page: number;
     limit: number;
   },
@@ -1630,6 +1764,7 @@ async function listCollectionItems(
   );
   url.searchParams.set("workspaceId", config.workspaceId);
   url.searchParams.set("collectionId", input.collectionId);
+  url.searchParams.set("env", input.env ?? config.env);
   if (input.projectId) {
     url.searchParams.set("projectId", input.projectId);
   }
@@ -1668,6 +1803,157 @@ async function listCollectionItems(
   });
 
   return payload;
+}
+
+type ItemFileEntry = {
+  id?: string;
+  order?: number;
+  data: Record<string, string | number | boolean | null>;
+};
+
+const DEFAULT_ITEMS_DIRECTORY = "mini/items";
+
+async function listAllCollectionItems(
+  config: ResolvedConfig,
+  collectionId: string,
+): Promise<ItemFileEntry[]> {
+  const limit = 500;
+  const items: ItemFileEntry[] = [];
+  let page = 1;
+
+  while (true) {
+    const payload = await listCollectionItems(config, {
+      collectionId,
+      projectId: config.projectId,
+      env: config.env,
+      page,
+      limit,
+    });
+
+    items.push(
+      ...payload.items.map((item) => ({
+        id: item.id,
+        order: item.order,
+        data: item.data,
+      })),
+    );
+
+    if (!payload.pagination.hasMore) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return items;
+}
+
+async function pullItems(
+  config: ResolvedConfig,
+  input: { collection?: string },
+) {
+  const payload = await pullSchemas(config);
+  const collections = input.collection
+    ? payload.collections.filter(
+        (collection) =>
+          collection.slug === input.collection ||
+          collection.id === input.collection,
+      )
+    : payload.collections;
+
+  if (input.collection && collections.length === 0) {
+    throw new Error(`Collection not found: ${input.collection}`);
+  }
+
+  const directory = resolve(DEFAULT_ITEMS_DIRECTORY, config.env);
+
+  for (const collection of collections) {
+    if (!collection.id) {
+      continue;
+    }
+
+    const items = await listAllCollectionItems(config, collection.id);
+    const filePath = join(directory, `${collection.slug}.json`);
+    await writeJson(filePath, items);
+    console.log(`Wrote ${relativeSafe(filePath)} (${items.length} item(s)).`);
+  }
+}
+
+async function pushItems(
+  config: ResolvedConfig,
+  input: { collection?: string; dryRun?: boolean },
+) {
+  const directory = resolve(DEFAULT_ITEMS_DIRECTORY, config.env);
+  const entries = await readdir(directory).catch((error: unknown) => {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return [];
+    }
+
+    throw error;
+  });
+
+  const files = entries
+    .filter((entry) => entry.endsWith(".json"))
+    .filter(
+      (entry) => !input.collection || entry === `${input.collection}.json`,
+    );
+
+  if (files.length === 0) {
+    throw new Error(
+      `No item files found in ${relativeSafe(directory)}. Run "mini-cms items pull" first.`,
+    );
+  }
+
+  for (const file of files) {
+    const slug = file.slice(0, -".json".length);
+    const items =
+      (await readJsonFile<ItemFileEntry[]>(join(directory, file))) ?? [];
+    const collection = await resolveCollectionIdentifier(config, slug);
+
+    let created = 0;
+    let updated = 0;
+
+    for (const item of items) {
+      if (input.dryRun) {
+        if (item.id) {
+          updated += 1;
+        } else {
+          created += 1;
+        }
+        continue;
+      }
+
+      if (item.id) {
+        await mutateCollectionItemWithApi(config, {
+          action: "update",
+          collection: collection.slug,
+          collectionId: collection.id,
+          itemId: item.id,
+          values: item.data,
+          merge: false,
+        });
+        updated += 1;
+      } else {
+        await mutateCollectionItemWithApi(config, {
+          action: "insert",
+          collection: collection.slug,
+          collectionId: collection.id,
+          values: item.data,
+          order: item.order,
+        });
+        created += 1;
+      }
+    }
+
+    console.log(
+      `${input.dryRun ? "Would sync" : "Synced"} ${collection.slug}: ${created} insert(s), ${updated} update(s).`,
+    );
+  }
 }
 
 async function listProjects(config: ResolvedConfig) {
@@ -1834,6 +2120,7 @@ async function mutateCollectionItemWithApi(
     itemId?: string;
     values?: Record<string, string | number | boolean | null>;
     items?: Array<Record<string, string | number | boolean | null>>;
+    order?: number;
     merge?: boolean;
   },
 ) {
@@ -1849,11 +2136,13 @@ async function mutateCollectionItemWithApi(
         action: input.action,
         workspaceId: config.workspaceId,
         projectId: config.projectId,
+        env: config.env,
         collection: input.collection,
         collectionId: input.collectionId,
         itemId: input.itemId,
         values: input.values,
         items: input.items,
+        order: input.order,
         merge: input.merge,
       }),
     },
@@ -2087,6 +2376,12 @@ async function promptForMiniConfig(
     "Default project ID",
     existingConfig.projectId,
   );
+  const defaultEnv = await promptValue(
+    ask,
+    "Default environment slug",
+    existingConfig.defaultEnv ?? "production",
+    { required: true },
+  );
   const environmentId = await promptValue(
     ask,
     "Default environment ID",
@@ -2128,6 +2423,10 @@ async function promptForMiniConfig(
     workspaceId,
     ...(projectId ? { projectId } : {}),
     ...(environmentId ? { environmentId } : {}),
+    defaultEnv,
+    ...(existingConfig.environments
+      ? { environments: existingConfig.environments }
+      : {}),
     ...(apiKey ? { apiKey } : {}),
     ...(collectionId ? { collectionId } : {}),
     collectionsPath,
