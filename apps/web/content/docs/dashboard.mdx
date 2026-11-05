@@ -202,6 +202,27 @@ Selections are per page and clear automatically when the files are removed or yo
 
 When a project has no assets, the empty state offers an `Upload asset` button. If a search or filter returns nothing, the page shows a separate no-matches state with a `Clear filters` action.
 
+## Table Controls
+
+Every list in the dashboard (members, projects, workspaces, API keys, collections, assets, and the dashboard overview) shares the same table toolbar and pagination bar, so you can manage large lists without reloading the page.
+
+The toolbar above each table provides:
+
+- **Filter input** — type to narrow the rows on the current page (case-insensitive match across the configured fields). The filter is debounced and only affects the visible rows; the server page is not re-fetched. When filtering hides some rows, a "Showing N of M on this page" hint appears.
+- **Refresh button** — re-fetches the current view and shows a spinning icon while the request is in flight.
+- **Sort by** — a dropdown of the sortable columns.
+- **Order** — a dropdown to switch between ascending and descending.
+
+You can also click a sortable column header to cycle through `none → ascending → descending → none`. The header and the toolbar dropdowns stay in sync.
+
+The pagination bar below each table provides:
+
+- A summary line: `Showing N items · Page X of Y`
+- **Rows per page** — a dropdown with `10`, `25`, or `50` items, next to an `(i)` icon whose tooltip reads: "Choose how many items to show per page. Larger page sizes load more data and may take longer to fetch."
+- **Prev** and **Next** buttons
+
+All of these settings are stored in the URL as query parameters (`page`, `pageSize`, `q`, `sort`, `order`), so a hard reload or a shared link restores the exact view. Page-size and sort changes are reflected in the URL immediately.
+
 ### API Key Scopes
 
 - **Workspace-scoped**: Full access to all projects and collections

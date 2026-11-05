@@ -18,9 +18,11 @@
 | 12    | 12-cleanup.md          | Cleanup & final steps      |
 | 13    | 13-environment-feature.md | Environment feature — content versioning for projects |
 | 14    | 14-invite-fix.md         | Invite flow fix — allow unauthenticated users to view & accept invites |
+| 15    | 15-table-controls.md     | Table controls — page size, refresh, filter, sort across dashboard tables |
 
 ## Order
 
-Execute phases in numerical order (1-14)
+Execute phases in numerical order (1-15)
 
 > **Phase 13** (environment feature) builds on top of all previous phases. Start it only after phases 1–12 are complete.
+> **Phase 15** (table controls) is implemented and merged into `main`.
