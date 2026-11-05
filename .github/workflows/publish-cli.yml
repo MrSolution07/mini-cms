@@ -3,7 +3,7 @@ name: Publish CLI to JSR
 on:
   push:
     tags:
-      - "cli-v*"
+      - "v*"
 
 jobs:
   publish:
