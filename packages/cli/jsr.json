@@ -12,7 +12,8 @@
       "dist/**/*.d.ts",
       "README.md",
       "LICENSE",
-      "jsr.json"
+      "jsr.json",
+      "package.json"
     ],
     "exclude": [
       "!dist"

@@ -15,6 +15,7 @@ import {
   DEFAULT_SKILL_DIRECTORY,
   DEFAULT_TYPES_PATH,
 } from "./constants";
+import packageJson from "../package.json" with { type: "json" };
 import {
   loadCollectionsInput as importedLoadCollectionsInput,
   normalizeCollections as importedNormalizeCollections,
@@ -274,10 +275,12 @@ const sharedArgs = {
   },
 } as const;
 
+const CLI_VERSION = packageJson.version;
+
 const miniCmsCommand = defineCommand({
   meta: {
     name: "mini-cms",
-    version: "0.0.0",
+    version: CLI_VERSION,
     description: "Mini CMS CLI",
   },
   subCommands: {
@@ -1115,7 +1118,7 @@ export async function run(argv = process.argv): Promise<void> {
     }
 
     if (rawArgs.length === 1 && rawArgs[0] === "--version") {
-      console.log("0.0.0");
+      console.log(CLI_VERSION);
       return;
     }
 
