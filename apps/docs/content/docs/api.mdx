@@ -82,7 +82,7 @@ Example response:
 
 ## Behavior
 
-- The endpoint is rate-limited per IP and workspace/collection pair.
+- The endpoint is rate-limited per API key or session (IP fallback for anonymous) and workspace/collection pair.
 - Responses are cached for 60 seconds.
 - Collection and item changes invalidate cached collection payloads.
 - Only items with `_published: true` are returned.

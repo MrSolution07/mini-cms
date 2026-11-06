@@ -150,7 +150,7 @@ send a real email. Everything else in the suite runs either way.
 
 - GET `/api/collections/:slug` cached for 60s via Upstash
 - Cache invalidates on any collection/item change
-- Rate-limited: 100 requests/minute per IP
+- Rate-limited: 300 requests/minute per API key or session (IP fallback for anonymous)
 
 ## Auth Flow
 

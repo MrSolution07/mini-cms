@@ -56,7 +56,7 @@ export const env = createEnv({
     UPSTASH_REDIS_KV_REST_API_TOKEN: z.string().min(1).optional(),
     UPSTASH_REDIS_KV_REST_API_URL: z.string().url().optional(),
     UPSTASH_REDIS_KV_REST_API_READ_ONLY_TOKEN: z.string().min(1).optional(),
-    RATE_LIMIT_TOKENS_PER_MINUTE: z.coerce.number().default(100),
+    RATE_LIMIT_TOKENS_PER_MINUTE: z.coerce.number().default(300),
   },
   shared: {
     APP_URL: z.string().url().default("http://localhost:3000"),
