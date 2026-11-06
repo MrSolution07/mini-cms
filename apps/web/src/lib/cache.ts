@@ -1,5 +1,6 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { createHash } from "node:crypto";
 import { env } from "@/lib/env";
 
 function logCacheError(operation: string, error: unknown) {
@@ -88,4 +89,38 @@ export async function checkRateLimit(
     // Allow request when rate limiter is unavailable
     return { success: true };
   }
+}
+
+function hashIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+export function getRateLimitClientIdentifier(request: Request): string {
+  // 1) API key from CLI / programmatic access
+  const apiKey = request.headers.get("x-api-key")?.trim();
+  if (apiKey && apiKey.length > 0) {
+    return `key:${hashIdentifier(apiKey)}`;
+  }
+
+  // 2) Session cookie (better-auth default cookie name)
+  const cookie = request.headers.get("cookie") ?? "";
+  const sessionMatch = cookie.match(/(?:^|;\s*)better-auth\.session_token=([^;]+)/);
+  if (sessionMatch?.[1]) {
+    return `session:${hashIdentifier(sessionMatch[1])}`;
+  }
+
+  // 3) Authorization Bearer token (fallback)
+  const authHeader = request.headers.get("authorization")?.trim();
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    const token = authHeader.slice(7).trim();
+    if (token.length > 0) {
+      return `token:${hashIdentifier(token)}`;
+    }
+  }
+
+  // 4) Fallback to IP for anonymous public requests
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? request.headers.get("x-real-ip")
+    ?? "local";
+  return `ip:${ip}`;
 }

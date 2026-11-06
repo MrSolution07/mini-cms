@@ -6,7 +6,7 @@ import { getCollectionById, getCollectionBySlug } from "@/db/queries/collections
 import { getEnvironmentBySlug, getProductionEnvironment } from "@/db/queries/environments";
 import { listItems } from "@/db/queries/items";
 import { normalizePagination } from "@/db/queries/shared";
-import { checkRateLimit, getCached, setCached } from "@/lib/cache";
+import { checkRateLimit, getCached, setCached, getRateLimitClientIdentifier } from "@/lib/cache";
 import {
   anonymizeServerValue,
   captureServerError,
@@ -88,7 +88,7 @@ export async function handleCollectionItems(request: Request) {
       ?? "local";
 
     const rateLimit = await checkRateLimit(
-      `public:${ip}:${workspaceId}:${projectId}:${collectionId ?? collectionSlug}`,
+      `${getRateLimitClientIdentifier(request)}:${workspaceId}:${projectId}:${collectionId ?? collectionSlug}`,
     );
 
     if (!rateLimit.success) {
