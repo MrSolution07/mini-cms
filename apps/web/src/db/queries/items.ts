@@ -1,26 +1,29 @@
-import { and, asc, count, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/db";
 import { collectionItems, collections } from "@/db/schema";
 
 /**
- * Restricts a collection item to a workspace.
+ * Loads an item only when its collection belongs to the workspace.
  *
- * Drizzle cannot join another table inside an UPDATE or DELETE, so the
- * ownership check is expressed as a subquery over the collection's workspace.
+ * A correlated EXISTS inside findFirst/update/delete fails on the hosted
+ * libSQL database, so ownership is checked with a second query.
  */
-function ownedByWorkspace(organizationId: string) {
-  return exists(
-    db
-      .select({ id: collections.id })
-      .from(collections)
-      .where(
-        and(
-          eq(collections.id, collectionItems.collectionId),
-          eq(collections.organizationId, organizationId),
-        ),
-      ),
-  );
+async function itemInWorkspace(id: string, organizationId: string) {
+  const item = await db.query.collectionItems.findFirst({
+    where: eq(collectionItems.id, id),
+  });
+
+  if (!item) return null;
+
+  const collection = await db.query.collections.findFirst({
+    where: and(
+      eq(collections.id, item.collectionId),
+      eq(collections.organizationId, organizationId),
+    ),
+  });
+
+  return collection ? item : null;
 }
 import {
   toStoredItemValues,
@@ -51,14 +54,23 @@ export async function listItems(
     query?: string;
     schema?: CollectionItemFilterField[];
     environmentId?: string;
+    includeUnassigned?: boolean;
   },
 ): Promise<PaginatedResult<typeof collectionItems.$inferSelect>> {
   const { limit, offset, page } = normalizePagination(input);
   const conditions = [eq(collectionItems.collectionId, collectionId)];
 
-  // Filter by environment if specified; otherwise return items from all environments
+  // Filter by environment if specified; otherwise return items from all environments.
+  // Production reads also keep rows with no environment. Those are legacy rows
+  // and dashboard creates that were saved before an environment id was stored.
   if (input?.environmentId) {
-    conditions.push(eq(collectionItems.environmentId, input.environmentId));
+    const matchesEnvironment = eq(collectionItems.environmentId, input.environmentId);
+    if (input.includeUnassigned) {
+      const unassigned = or(matchesEnvironment, isNull(collectionItems.environmentId));
+      if (unassigned) conditions.push(unassigned);
+    } else {
+      conditions.push(matchesEnvironment);
+    }
   }
 
   if (input?.publishedOnly) {
@@ -170,11 +182,11 @@ function parseBooleanFilter(value: string) {
 }
 
 export async function getItemById(id: string, organizationId?: string) {
-  const item = await db.query.collectionItems.findFirst({
-    where: organizationId
-      ? and(eq(collectionItems.id, id), ownedByWorkspace(organizationId))
-      : eq(collectionItems.id, id),
-  });
+  const item = organizationId
+    ? await itemInWorkspace(id, organizationId)
+    : await db.query.collectionItems.findFirst({
+        where: eq(collectionItems.id, id),
+      });
 
   return item ? withSystemItemValues(item) : null;
 }
@@ -219,12 +231,13 @@ export async function updateItem(
   id: string,
   data: CollectionItemData,
   organizationId?: string,
+  environmentId?: string,
 ) {
-  const existing = await db.query.collectionItems.findFirst({
-    where: organizationId
-      ? and(eq(collectionItems.id, id), ownedByWorkspace(organizationId))
-      : eq(collectionItems.id, id),
-  });
+  const existing = organizationId
+    ? await itemInWorkspace(id, organizationId)
+    : await db.query.collectionItems.findFirst({
+        where: eq(collectionItems.id, id),
+      });
 
   if (!existing) {
     return null;
@@ -234,23 +247,18 @@ export async function updateItem(
     .update(collectionItems)
     .set({
       data: toStoredItemValues(data, existing.data._published === true),
+      ...(environmentId && !existing.environmentId ? { environmentId } : {}),
       updatedAt: new Date().toISOString(),
     })
-    .where(
-      organizationId
-        ? and(eq(collectionItems.id, id), ownedByWorkspace(organizationId))
-        : eq(collectionItems.id, id),
-    );
+    .where(eq(collectionItems.id, id));
 
   return getItemById(id, organizationId);
 }
 
 export async function deleteItem(id: string, organizationId?: string) {
   if (organizationId) {
-    await db
-      .delete(collectionItems)
-      .where(and(eq(collectionItems.id, id), ownedByWorkspace(organizationId)));
-    return;
+    const existing = await itemInWorkspace(id, organizationId);
+    if (!existing) return;
   }
 
   await db.delete(collectionItems).where(eq(collectionItems.id, id));

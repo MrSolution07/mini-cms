@@ -852,6 +852,7 @@ function CollectionPageContent(props: {
           collection={collection}
           item={editingItem}
           projectId={search.projectId}
+          environmentId={currentEnv?.id}
           onClose={() => setShowModal(false)}
           onSaved={(savedMessage) => {
             setMessage(savedMessage);
@@ -1076,6 +1077,7 @@ function ItemEditorModal(props: {
   };
   item: ItemRecord | null;
   projectId?: string;
+  environmentId?: string;
   onClose: () => void;
   onSaved: (message: { type: "success" | "error"; text: string }) => void;
 }) {
@@ -1114,6 +1116,7 @@ function ItemEditorModal(props: {
             id: props.item.id,
             slug: props.collection.slug,
             values,
+            environmentId: props.item.environmentId ? undefined : props.environmentId,
           },
         })
       : await createItemServerFn({
@@ -1121,6 +1124,7 @@ function ItemEditorModal(props: {
             collectionId: props.collection.id,
             slug: props.collection.slug,
             values,
+            environmentId: props.environmentId,
           },
         });
 

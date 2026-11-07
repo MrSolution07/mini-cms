@@ -83,8 +83,9 @@ Example response:
 ## Behavior
 
 - The endpoint is rate-limited per API key or session (IP fallback for anonymous) and workspace/collection pair.
-- Responses are cached for 60 seconds.
-- Collection and item changes invalidate cached collection payloads.
+- The server caches a response for 60 seconds. A collection or item change deletes those entries.
+- The response uses `Cache-Control: private, no-store`, so the browser and CDN ask the server again. A published item shows on the next request.
+- A production read includes items saved before an environment id existed. Preview reads stay limited to that environment.
 - Only items with `_published: true` are returned.
 - Filters are validated against system fields and the collection schema.
 - `q` performs a broad text search; `filter.<fieldKey>` narrows to exact values.

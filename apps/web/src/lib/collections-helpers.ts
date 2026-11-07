@@ -188,6 +188,20 @@ export const getCollectionPageServerFn = createServerFn({ method: "GET" })
     return { collection, items, environment: environmentId ? undefined : undefined };
   });
 
+async function resolveItemEnvironmentId(projectId: string, requestedId?: string) {
+  const { getEnvironmentById, getProductionEnvironment } = await import(
+    "../db/queries/environments"
+  );
+
+  if (requestedId) {
+    const environment = await getEnvironmentById(requestedId);
+    if (environment?.projectId === projectId) return environment.id;
+  }
+
+  const production = await getProductionEnvironment(projectId);
+  return production?.id;
+}
+
 export const createItemServerFn = createServerFn({ method: "POST" })
   .validator(
     (data: {
@@ -195,14 +209,19 @@ export const createItemServerFn = createServerFn({ method: "POST" })
       slug: string;
       values: Record<string, string | number | boolean | null>;
       order?: number;
+      environmentId?: string;
     }) => data,
   )
   .handler(async ({ data, ...ctx }) => {
     const { requireCollectionAccess } = await import("./project-access");
     const { createItemAction } = await import("../server/functions/items");
-    const { organizationId } = await requireCollectionAccess(
+    const { collection, organizationId } = await requireCollectionAccess(
       ctx,
       data.collectionId,
+    );
+    const environmentId = await resolveItemEnvironmentId(
+      collection.projectId,
+      data.environmentId,
     );
     return createItemAction(
       data.collectionId,
@@ -210,6 +229,7 @@ export const createItemServerFn = createServerFn({ method: "POST" })
       data.values,
       data.order,
       organizationId,
+      environmentId,
     );
   });
 
@@ -219,17 +239,25 @@ export const updateItemServerFn = createServerFn({ method: "POST" })
       id: string;
       slug: string;
       values: Record<string, string | number | boolean | null>;
+      environmentId?: string;
     }) => data,
   )
   .handler(async ({ data, ...ctx }) => {
     const { requireItemAccess } = await import("./project-access");
     const { updateItemAction } = await import("../server/functions/items");
-    const { organizationId } = await requireItemAccess(ctx, data.id);
+    const { item, projectId, organizationId } = await requireItemAccess(
+      ctx,
+      data.id,
+    );
+    const environmentId = item.environmentId
+      ? undefined
+      : await resolveItemEnvironmentId(projectId, data.environmentId);
     return updateItemAction(
       data.id,
       data.slug,
       data.values,
       organizationId,
+      environmentId,
     );
   });
 

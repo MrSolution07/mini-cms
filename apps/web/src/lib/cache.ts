@@ -48,10 +48,28 @@ export async function invalidateCollectionCache(
   slug: string,
   environmentId?: string,
 ) {
+  await invalidateCache(`collection:${slug}`);
   if (environmentId) {
     await invalidateCache(`collection:${slug}:env:${environmentId}`);
-  } else {
-    await invalidateCache(`collection:${slug}`);
+  }
+  await invalidatePublicCollectionCache();
+}
+
+async function invalidatePublicCollectionCache() {
+  try {
+    let cursor = 0;
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, {
+        match: "public:*",
+        count: 100,
+      });
+      cursor = Number(nextCursor);
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } while (cursor !== 0);
+  } catch (error) {
+    logCacheError("invalidatePublicCollectionCache", error);
   }
 }
 

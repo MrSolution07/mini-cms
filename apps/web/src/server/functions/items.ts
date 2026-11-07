@@ -72,11 +72,12 @@ export async function updateItemAction(
   slug: string,
   data: CollectionItemData,
   organizationId?: string,
+  environmentId?: string,
 ) {
   const identity = createAnonymousServerIdentity({ subject: id });
 
   try {
-    const item = await updateItem(id, data, organizationId);
+    const item = await updateItem(id, data, organizationId, environmentId);
     await invalidateCollectionCache(slug);
 
     await captureServerEvent({

@@ -248,7 +248,7 @@ export async function handleCollectionItems(request: Request) {
 
       return json(cached, 200, {
         "x-cache": "HIT",
-        "cache-control": "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
+        "cache-control": "private, no-store",
       });
     }
 
@@ -260,6 +260,7 @@ export async function handleCollectionItems(request: Request) {
       filters,
       schema: collection.schema,
       environmentId: environmentId ?? undefined,
+      includeUnassigned: env?.isProduction === true,
     });
 
     const payload = {
@@ -303,7 +304,7 @@ export async function handleCollectionItems(request: Request) {
 
     return json(payload, 200, {
       "x-cache": "MISS",
-      "cache-control": "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
+      "cache-control": "private, no-store",
     });
   } catch (error) {
     await captureServerError({
